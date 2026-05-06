@@ -62,7 +62,7 @@ typedef struct {
 struct User {
     string username;
     string password;
-    string role;              // <-- TAMBAHAN: "admin" atau "user"
+    string role;
     int jumlahPlaylist = 0; 
     Playlist musiklist[50];
 };
@@ -71,7 +71,7 @@ typedef struct {
     string judul;
     int jumlahlagu = 0;
     Musik lagu[50];
-    string dibuatOleh;        // Username admin yang membuat
+    string dibuatOleh;
 } PlaylistGlobal;
 
 PlaylistGlobal playlistGlobal[50];
@@ -92,6 +92,20 @@ void Daftarlagu(Playlist *p, int indexLagu) {
     printLine();
     
     Daftarlagu(p, indexLagu + 1);
+}
+
+void DaftarLaguGlobal(PlaylistGlobal *pg, int indexLagu) {
+    if(indexLagu == pg->jumlahlagu) return;
+    
+    Musik *ptrLagu = &pg->lagu[indexLagu];
+    cout << "Lagu ke-" << indexLagu + 1 << endl;
+    cout << left << setw(10) << "Judul" << ": " << ptrLagu->judulLagu << endl;
+    cout << left << setw(10) << "Artis" << ": " << ptrLagu->artis << endl;
+    cout << left << setw(10) << "Genre" << ": " << ptrLagu->genre << endl;
+    cout << left << setw(10) << "Tahun" << ": " << ptrLagu->tahun << endl;
+    printLine();
+    
+    DaftarLaguGlobal(pg, indexLagu + 1);
 }
 
 bool usntersedia(User pengguna[], int jumlahuser, string targetUsername) {
@@ -128,6 +142,7 @@ void Register(User pengguna[], int &jumlahuser) {
     }
     else {
         pengguna[jumlahuser].username = username;
+        pengguna[jumlahuser].role = "user";
         cout << left << setw(12) << "Password" << ": "; cin >> password;
         pengguna[jumlahuser].password = password;
         jumlahuser++; 
@@ -183,10 +198,8 @@ void Datalagu(Musik *laguBaru) {
             cout << left << setw(12) << "Genre" << ": ";
             getline(cin, Genre);
             
-            // LANGSUNG ubah ke lowercase setelah input
             Genre = toLowerCase(Genre);
             
-            // Validasi menggunakan variabel yang sudah lowercase
             if(!validasigenre(Genre)){
                 throw invalid_argument("klasik, pop, rock, jazz, atau hip hop");
             }
@@ -199,7 +212,6 @@ void Datalagu(Musik *laguBaru) {
         }
     } while (!genrevalid);
     
-    // Simpan genre (yang sudah lowercase) ke struct
     laguBaru->genre = Genre;
 
     int Tahun;
@@ -228,6 +240,63 @@ void Datalagu(Musik *laguBaru) {
     laguBaru->tahun = Tahun;
 }
 
+void DatalaguGlobal(Musik *laguBaru) {
+    cout << left << setw(12) << "Judul lagu" << ": ";
+    getline(cin, laguBaru->judulLagu);
+    
+    cout << left << setw(12) << "Artis" << ": ";
+    getline(cin, laguBaru->artis);
+    
+    string Genre;
+    bool genrevalid = false;
+    do{
+        try {
+            cout << left << setw(12) << "Genre" << ": ";
+            getline(cin, Genre);
+            
+            Genre = toLowerCase(Genre);
+            
+            if(!validasigenre(Genre)){
+                throw invalid_argument("klasik, pop, rock, jazz, atau hip hop");
+            }
+            genrevalid = true; 
+        }
+        catch(const exception& e) {
+            cout << left << setw(12) << "Info" << ": Input harus " << e.what() << endl;
+            cout << endl << "Tekan Enter untuk melanjutkan...";
+            cin.get();
+        }
+    } while (!genrevalid);
+    
+    laguBaru->genre = Genre;
+
+    int Tahun;
+    bool tahunvalid = false;
+    do{
+        try {
+            cout << left << setw(12) << "Tahun" << ": ";
+            cin >> Tahun;
+
+            if(cin.fail()){
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                throw invalid_argument("angka");
+            }
+            else if (Tahun < 1900 || Tahun > 2026) {
+                throw out_of_range("1900 hingga 2026");
+            }
+            tahunvalid = true;
+        }
+        catch(const exception& e) {
+            cout << left << setw(12) << "Info" << ": Tahun hanya dari rentang " << e.what() << endl;
+            cout <<endl<<"Tekan Enter untuk melanjutkan...";
+            cin.get();
+        }
+    }while(!tahunvalid);
+    laguBaru->tahun = Tahun;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
 void buatPlaylist(User *u) {
     int playlist = u->jumlahPlaylist; 
     if(playlist >= 50){
@@ -241,6 +310,8 @@ void buatPlaylist(User *u) {
     cin.ignore();
     getline(cin, u->musiklist[playlist].judul);
     
+    u->musiklist[playlist].privasi = "Privat";
+
     int jumlahlagu;
     bool jumlahvalid = false;
     do{
@@ -292,6 +363,7 @@ void lihatPlaylist(User *u) {
         cout << HEAD << endl;
         cout << left << setw(15) << "Nama Playlist" << ": " << u->musiklist[i].judul << endl;
         cout << left << setw(15) << "Jumlah Lagu" << ": " << u->musiklist[i].jumlahlagu << " Lagu" << endl;
+        cout << left << setw(15) << "Privasi" << ": " << u->musiklist[i].privasi << endl;
         cout << HEAD << endl;
         
         Daftarlagu(&u->musiklist[i], 0);
@@ -300,7 +372,7 @@ void lihatPlaylist(User *u) {
 }
 
 void ubahPlaylist(User *u) {
-    int totalPlaylist = u->jumlahPlaylist;
+    int totalPlaylist = u->jumlahPlaylist; 
     if(totalPlaylist == 0){
         cout << left << setw(12) << "Info" << ": Anda belum memiliki Playlist" << endl;
         pause();
@@ -310,7 +382,7 @@ void ubahPlaylist(User *u) {
     printHeader("UBAH PLAYLIST");
     cout << "Daftar Playlist:" << endl;
     for(int i = 0; i < totalPlaylist; i++){
-        cout << i + 1 << ". " << u->musiklist[i].judul << endl;
+        cout << i + 1 << ". " << u->musiklist[i].judul << " (" << u->musiklist[i].privasi << ")" << endl;
     }
 
     int pilihPlaylist;
@@ -332,39 +404,42 @@ void ubahPlaylist(User *u) {
         }
         catch(const exception& e) {
             cout << left << setw(12) << "Info" << ": " << e.what() << endl;
-            cout <<endl<<"Tekan Enter untuk melanjutkan...";
+            cout << endl << "Tekan Enter untuk melanjutkan...";
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cin.get();
         }
-    }while (!validPlaylist);
+    } while (!validPlaylist);
     
     int indexP = pilihPlaylist - 1;
     
     printLine();
     cout << left << setw(5) << " " << "1. Nama Playlist" << endl;
     cout << left << setw(5) << " " << "2. Data Lagu" << endl;
+    cout << left << setw(5) << " " << "3. Ubah Status Privasi (Publik/Privat)" << endl;
     
     int Opsi;
     bool opsivalid = false;
     do{
         try {
-            cout << "Pilih opsi (1/2): ";
+            cout << "Pilih opsi (1/2/3): ";
             cin >> Opsi;
             if(cin.fail()){
                 cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 throw invalid_argument("angka");
             }
-            else if(Opsi < 1 || Opsi > 2){
-                throw out_of_range("1 atau 2");
+            else if(Opsi < 1 || Opsi > 3){
+                throw out_of_range("1, 2, atau 3");
             }
             opsivalid = true;
         }
         catch(const exception& e) {
             cout << left << setw(12) << "Info" << ": Pilihan hanya " << e.what() << endl;
             cout << "\nTekan Enter untuk melanjutkan...";
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cin.get();
         }
-    }while (!opsivalid);
+    } while (!opsivalid);
 
     if(Opsi == 1){
         cout << left << setw(20) << "Nama Playlist Baru" << ": ";
@@ -402,10 +477,11 @@ void ubahPlaylist(User *u) {
                 }
                 catch(const exception& e) {
                     cout << left << setw(12) << "Info" << ": " << e.what() << endl;
-                    cout <<endl<<"Tekan Enter untuk melanjutkan...";
+                    cout << endl << "Tekan Enter untuk melanjutkan...";
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
                     cin.get();
                 }
-            }while (!validLagu);
+            } while (!validLagu);
             
             int indexL = pilihLagu - 1;
             cout << "\n--- Data Lagu Baru ---" << endl;
@@ -413,52 +489,274 @@ void ubahPlaylist(User *u) {
             cout << left << setw(12) << "Info" << ": Data lagu berhasil diubah" << endl;
         }
     }
+    else if (Opsi == 3){
+        if(u->musiklist[indexP].privasi == "Publik"){
+            u->musiklist[indexP].privasi = "Privat";
+        } else {
+            u->musiklist[indexP].privasi = "Publik";
+        }
+        cout << left << setw(20) << "Status Baru" << ": " << u->musiklist[indexP].privasi << endl;
+        cout << left << setw(12) << "Info" << ": Status privasi berhasil diperbarui" << endl;
+    }
     pause();
 }
 
-void hapusPlaylist(User *u) {
-    int totalPlaylist = u->jumlahPlaylist;
-    if(totalPlaylist == 0){
-        cout << left << setw(12) << "Info" << ": Anda belum memiliki Playlist" << endl;
-        pause();
-        return;
-    }
-
-    printHeader("HAPUS PLAYLIST");
-    cout << "Daftar Playlist:" << endl;
-    for(int i = 0; i < totalPlaylist; i++){
-        cout << i + 1 << ". " << u->musiklist[i].judul << endl;
-    }
-
-    int pilihPlaylist;
-    bool validPlaylist = false;
+void hapusDataUser(User pengguna[], int &jumlahuser, int &userindex) {
+    printHeader("HAPUS DATA");
+    cout << left << setw(5) << " " << "1. Hapus Playlist" << endl;
+    cout << left << setw(5) << " " << "2. Hapus Lagu dalam Playlist" << endl;
+    cout << left << setw(5) << " " << "3. Hapus Akun Sendiri" << endl;
+    
+    int Opsi;
+    bool opsivalid = false;
     do{
         try {
-            cout << "Pilih nomor playlist yang ingin diproses (1 - " << totalPlaylist << "): ";
-            cin >> pilihPlaylist;
-            
+            cout << "Pilih opsi (1/2/3): ";
+            cin >> Opsi;
             if(cin.fail()){
                 cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 throw invalid_argument("angka");
             } 
-            else if(pilihPlaylist < 1 || pilihPlaylist > totalPlaylist){
-                throw out_of_range("Nomor playlist tidak ditemukan");
+            else if(Opsi < 1 || Opsi > 3){
+                throw out_of_range("1, 2, atau 3");
             } 
+            opsivalid = true;
+        }
+        catch(const exception& e) {
+            cout << left << setw(12) << "Info" << ": Pilihan hanya " << e.what() << endl;
+            cout << endl <<"Tekan Enter untuk melanjutkan...";
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cin.get();
+        }
+    }while(!opsivalid);
+
+    if(Opsi == 1){
+        User *u = &pengguna[userindex];
+        int totalPlaylist = u->jumlahPlaylist;
+        if(totalPlaylist == 0){
+            cout << left << setw(12) << "Info" << ": Anda belum memiliki Playlist" << endl;
+            pause();
+            return;
+        }
+        cout << "Daftar Playlist:" << endl;
+        for(int i = 0; i < totalPlaylist; i++){
+            cout << i + 1 << ". " << u->musiklist[i].judul << endl;
+        }
+        int pilihPlaylist;
+        bool validPlaylist = false;
+        do{
+            try {
+                cout << "Pilih nomor playlist yang ingin dihapus (1 - " << totalPlaylist << "): ";
+                cin >> pilihPlaylist;
+                if(cin.fail()){
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    throw invalid_argument("angka");
+                } else if(pilihPlaylist < 1 || pilihPlaylist > totalPlaylist){
+                    throw out_of_range("Nomor playlist tidak ditemukan");
+                } 
+                validPlaylist = true;
+            }
+            catch(const exception& e) {
+                cout << left << setw(12) << "Info" << ": " << e.what() << endl;
+                cout << endl <<"Tekan Enter untuk melanjutkan...";
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cin.get();
+            }
+        }while (!validPlaylist);
+        int indexP = pilihPlaylist - 1;
+        for(int i = indexP; i < totalPlaylist - 1; i++){
+            u->musiklist[i] = u->musiklist[i + 1];
+        }
+        u->jumlahPlaylist--;
+        cout << left << setw(12) << "Info" << ": Playlist berhasil dihapus" << endl;
+    } 
+    else if(Opsi == 2){
+        User *u = &pengguna[userindex];
+        int totalPlaylist = u->jumlahPlaylist;
+        if(totalPlaylist == 0){
+            cout << left << setw(12) << "Info" << ": Anda belum memiliki Playlist" << endl;
+            pause();
+            return;
+        }
+        cout << "Daftar Playlist:" << endl;
+        for(int i = 0; i < totalPlaylist; i++){
+            cout << i + 1 << ". " << u->musiklist[i].judul << endl;
+        }
+        int pilihPlaylist;
+        bool validPlaylist = false;
+        do{
+            try {
+                cout << "Pilih nomor playlist yang ingin dipilih (1 - " << totalPlaylist << "): ";
+                cin >> pilihPlaylist;
+                if(cin.fail()){
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    throw invalid_argument("angka");
+                } else if(pilihPlaylist < 1 || pilihPlaylist > totalPlaylist){
+                    throw out_of_range("Nomor playlist tidak ditemukan");
+                }
+                validPlaylist = true;
+            }
+            catch(const exception& e) {
+                cout << left << setw(12) << "Info" << ": " << e.what() << endl;
+                cout << endl <<"Tekan Enter untuk melanjutkan...";
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cin.get();
+            }
+        }while(!validPlaylist);
+        int indexP = pilihPlaylist - 1;
+        int jumlahlagu = u->musiklist[indexP].jumlahlagu;
+        if(jumlahlagu == 0){
+            cout << left << setw(12) << "Info" << ": Playlist tidak memiliki lagu" << endl;
+        } 
+        else{
+            cout << "\nDaftar Lagu di '" << u->musiklist[indexP].judul << "':" << endl;
+            for(int j = 0; j < jumlahlagu; j++){
+                cout << j + 1 << ". " << u->musiklist[indexP].lagu[j].judulLagu << " - " << u->musiklist[indexP].lagu[j].artis << endl;
+            }
+            int pilihLagu;
+            bool validLagu = false;
+            do{
+                try {
+                    cout << "Pilih nomor lagu yang ingin dihapus (1 - " << jumlahlagu << "): ";
+                    cin >> pilihLagu;
+                    if (cin.fail()) {
+                        cin.clear();
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                        throw invalid_argument("angka");
+                    } else if(pilihLagu < 1 || pilihLagu > jumlahlagu){
+                        throw out_of_range("Nomor lagu tidak ditemukan");
+                    } 
+                    validLagu = true;
+                }
+                catch(const exception& e) {
+                    cout << left << setw(12) << "Info" << ": " << e.what() << endl;
+                    cout <<  '\n' <<"Tekan Enter untuk melanjutkan...";
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    cin.get();
+                }
+            }while (!validLagu);
+            int indexL = pilihLagu - 1;
+            for(int k = indexL; k < jumlahlagu - 1; k++){
+                u->musiklist[indexP].lagu[k] = u->musiklist[indexP].lagu[k + 1];
+            }
+            u->musiklist[indexP].jumlahlagu--;
+            cout << left << setw(12) << "Info" << ": Lagu berhasil dihapus" << endl;
+        }
+    }
+    else if(Opsi == 3){
+        cout << "Apakah anda yakin ingin menghapus akun? (y/n): ";
+        char konfirmasi;
+        cin >> konfirmasi;
+        if(tolower(konfirmasi) == 'y'){
+            for(int i = userindex; i < jumlahuser - 1; i++){
+                pengguna[i] = pengguna[i + 1];
+            }
+            jumlahuser--;
+            userindex = -1;
+            cout << left << setw(12) << "Info" << ": Akun berhasil dihapus" << endl;
+            pause();
+            return;
+        }
+    }
+    pause();
+}
+
+void buatPlaylistGlobal(User *u) {
+    if(jumlahPlaylistGlobal >= 50){
+        cout << left << setw(12) << "Info" << ": Kapasitas Playlist Global sudah penuh" << endl;
+        pause();
+        return;
+    }
+
+    printHeader("BUAT PLAYLIST GLOBAL");
+    int idx = jumlahPlaylistGlobal;
+    cout << left << setw(15) << "Nama Playlist" << ": ";
+    cin.ignore();
+    getline(cin, playlistGlobal[idx].judul);
+
+    int jumlahlagu;
+    bool jumlahvalid = false;
+    do{
+        try {
+            cout << left << setw(15) << "Jumlah lagu" << ": ";
+            cin >> jumlahlagu;
+
+            if(cin.fail()){
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                throw invalid_argument("angka");
+            } 
+            else if(jumlahlagu <= 0 || jumlahlagu > 50){
+                throw out_of_range("1 sampai 50");
+            } 
+            else{
+                jumlahvalid = true;
+            }
+        }
+        catch(const exception& e) {
+            cout << left << setw(12) << "Info" << ": Jumlah lagu hanya dari rentang " << e.what() << endl;
+            cout << '\n' <<"Tekan Enter untuk melanjutkan...";
+            cin.get();
+        }
+    }while(!jumlahvalid);
+
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    for(int i = 0; i < jumlahlagu; i++){
+        cout << endl << "Lagu ke-" << i + 1 << endl;
+        DatalaguGlobal(&playlistGlobal[idx].lagu[i]);
+    }
+
+    playlistGlobal[idx].jumlahlagu = jumlahlagu;
+    playlistGlobal[idx].dibuatOleh = u->username;
+    jumlahPlaylistGlobal++;
+    cout << left << setw(12) << "Info" << ": Playlist Global berhasil dibuat" << endl;
+    pause();
+}
+
+void updatePlaylistGlobal() {
+    if(jumlahPlaylistGlobal == 0){
+        cout << left << setw(12) << "Info" << ": Belum ada Playlist Global" << endl;
+        pause();
+        return;
+    }
+    printHeader("UPDATE PLAYLIST GLOBAL");
+    cout << "Daftar Playlist Global:" << endl;
+    for(int i = 0; i < jumlahPlaylistGlobal; i++){
+        cout << i + 1 << ". " << playlistGlobal[i].judul << " (dibuat oleh: " << playlistGlobal[i].dibuatOleh << ")" << endl;
+    }
+    int pilihPlaylist;
+    bool validPlaylist = false;
+    do{
+        try {
+            cout << "Pilih nomor playlist yang ingin diupdate (1 - " << jumlahPlaylistGlobal << "): ";
+            cin >> pilihPlaylist;
+            if(cin.fail()){
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                throw invalid_argument("angka");
+            }
+            else if(pilihPlaylist < 1 || pilihPlaylist > jumlahPlaylistGlobal){
+                throw out_of_range("Nomor playlist tidak ditemukan");
+            }
             validPlaylist = true;
         }
         catch(const exception& e) {
             cout << left << setw(12) << "Info" << ": " << e.what() << endl;
-            cout << endl <<"Tekan Enter untuk melanjutkan...";
+            cout << endl << "Tekan Enter untuk melanjutkan...";
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cin.get();
         }
-    }while (!validPlaylist);
-    
+    } while (!validPlaylist);
+
     int indexP = pilihPlaylist - 1;
+
     printLine();
-    cout << left << setw(5) << " " << "1. Hapus Playlist" << endl;
-    cout << left << setw(5) << " " << "2. Hapus Lagu dalam Playlist" << endl;
-    
+    cout << left << setw(5) << " " << "1. Ubah Nama Playlist" << endl;
+    cout << left << setw(5) << " " << "2. Ubah Data Lagu" << endl;
+
     int Opsi;
     bool opsivalid = false;
     do{
@@ -469,67 +767,66 @@ void hapusPlaylist(User *u) {
                 cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 throw invalid_argument("angka");
-            } 
+            }
             else if(Opsi < 1 || Opsi > 2){
                 throw out_of_range("1 atau 2");
-            } 
+            }
             opsivalid = true;
         }
         catch(const exception& e) {
             cout << left << setw(12) << "Info" << ": Pilihan hanya " << e.what() << endl;
-            cout << endl <<"Tekan Enter untuk melanjutkan...";
+            cout << "\nTekan Enter untuk melanjutkan...";
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cin.get();
         }
-    }while(!opsivalid);
+    } while (!opsivalid);
 
     if(Opsi == 1){
-        for(int i = indexP; i < totalPlaylist - 1; i++){
-            u->musiklist[i] = u->musiklist[i + 1];
-        }
-        u->jumlahPlaylist--;
-        cout << left << setw(12) << "Info" << ": Playlist berhasil dihapus" << endl;
-    } 
+        cout << left << setw(20) << "Nama Playlist Baru" << ": ";
+        cin.ignore();
+        getline(cin, playlistGlobal[indexP].judul);
+        cout << left << setw(12) << "Info" << ": Judul Playlist Global berhasil diubah" << endl;
+    }
     else if(Opsi == 2){
-        int jumlahlagu = u->musiklist[indexP].jumlahlagu;
+        int jumlahlagu = playlistGlobal[indexP].jumlahlagu;
         if(jumlahlagu == 0){
-            cout << left << setw(12) << "Info" << ": Playlist tidak memiliki lagu" << endl;
-        } 
+            cout << left << setw(12) << "Info" << ": Playlist belum ada lagu" << endl;
+        }
         else{
-            cout << "\nDaftar Lagu di '" << u->musiklist[indexP].judul << "':" << endl;
+            cout << "\nDaftar Lagu:" << endl;
             for(int j = 0; j < jumlahlagu; j++){
-                cout << j + 1 << ". " << u->musiklist[indexP].lagu[j].judulLagu << " - " << u->musiklist[indexP].lagu[j].artis << endl;
+                cout << j + 1 << ". " << playlistGlobal[indexP].lagu[j].judulLagu << " - " << playlistGlobal[indexP].lagu[j].artis << endl;
             }
 
             int pilihLagu;
             bool validLagu = false;
             do{
                 try {
-                    cout << "Pilih nomor lagu yang ingin dihapus (1 - " << jumlahlagu << "): ";
+                    cout << "Pilih nomor lagu yang ingin diubah (1 - " << jumlahlagu << "): ";
                     cin >> pilihLagu;
-                    
-                    if (cin.fail()) {
+                    if(cin.fail()){
                         cin.clear();
                         cin.ignore(numeric_limits<streamsize>::max(), '\n');
                         throw invalid_argument("angka");
-                    } 
+                    }
                     else if(pilihLagu < 1 || pilihLagu > jumlahlagu){
                         throw out_of_range("Nomor lagu tidak ditemukan");
-                    } 
+                    }
                     validLagu = true;
                 }
                 catch(const exception& e) {
                     cout << left << setw(12) << "Info" << ": " << e.what() << endl;
-                    cout <<  '\n' <<"Tekan Enter untuk melanjutkan...";
+                    cout << endl << "Tekan Enter untuk melanjutkan...";
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
                     cin.get();
                 }
-            }while (!validLagu);
-            
+            } while (!validLagu);
+
             int indexL = pilihLagu - 1;
-            for(int k = indexL; k < jumlahlagu - 1; k++){
-                u->musiklist[indexP].lagu[k] = u->musiklist[indexP].lagu[k + 1];
-            }
-            u->musiklist[indexP].jumlahlagu--;
-            cout << left << setw(12) << "Info" << ": Lagu berhasil dihapus" << endl;
+            cout << "\n--- Data Lagu Baru ---" << endl;
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            DatalaguGlobal(&playlistGlobal[indexP].lagu[indexL]);
+            cout << left << setw(12) << "Info" << ": Data lagu berhasil diubah" << endl;
         }
     }
     pause();
@@ -703,7 +1000,6 @@ void menuSearching(User *u){
     pause();
 }
 
-// Fungsi Helper: Memilih & memvalidasi nomor playlist (0-based index)
 int dapatkanIndexPlaylist(const User* u) {
     int pilihan;
     while(true) {
@@ -715,12 +1011,12 @@ int dapatkanIndexPlaylist(const User* u) {
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 throw invalid_argument("angka");
             }
-            cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Bersihkan newline
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             
             if(pilihan < 1 || pilihan > u->jumlahPlaylist) {
                 throw out_of_range("Nomor playlist tidak valid");
             }
-            return pilihan - 1; // Kembalikan index berbasis 0
+            return pilihan - 1;
         } catch(const exception& e) {
             cout << left << setw(12) << "Info" << ": " << e.what() << endl;
         }
@@ -749,7 +1045,7 @@ void menuSorting(User *u) {
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
             throw invalid_argument("angka");
         }
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Bersihkan newline
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
     } catch(const exception& e) {
         cout << left << setw(12) << "Info" << ": Input harus " << e.what() << endl;
         pause();
@@ -792,7 +1088,7 @@ void menuSorting(User *u) {
             break;
         }
         case 4:
-            return; // Langsung kembali ke menu utama tanpa pause/clear screen
+            return;
         default:
             cout << left << setw(12) << "Info" << ": Pilihan tidak valid" << endl;
             pause();
@@ -850,7 +1146,57 @@ bool halamanMasuk(int &userindex) {
     }
 }
 
-void halamanUtama(int userindex) {
+void halamanUtamaAdmin(int &userindex) {
+    while(true){
+        clearScreen();
+        int opsi;
+        printHeader("HALAMAN UTAMA - ADMIN");
+        cout << "1. " << endl;
+        cout << "2. " << endl;
+        cout << "3. Buat Playlist Global" << endl;
+        cout << "4. Update Playlist Global" << endl;
+        cout << "5. Halaman Masuk" << endl;
+        printLine();
+        cout << "Pilih opsi\t: "; 
+        
+        try {
+            cin >> opsi;
+            if(cin.fail()){
+                cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                throw invalid_argument("angka");
+            }
+        } catch(const exception& e) {
+            cout << left << setw(12) << "Info" << ": Input harus " << e.what() << endl;
+            cout << "\nTekan Enter untuk melanjutkan...";
+            cin.get();
+            continue;
+        }cout << endl << endl;
+        
+        if (opsi == 1){
+            // Fitur admin 1
+        }
+        else if(opsi == 2){
+            // Fitur admin 2
+        }
+        else if(opsi == 3){
+            buatPlaylistGlobal(&pengguna[userindex]);
+        }
+        else if(opsi == 4){
+            updatePlaylistGlobal();
+        }
+        else if(opsi == 5){
+            cout << left << setw(12) << "Info" << ": Kembali ke halaman masuk" << endl;
+            pause();
+            return;
+        }
+        else {
+            cout << left << setw(12) << "Info" << ": Pilihan tidak valid" << endl;
+            pause();
+        }
+    }
+}
+
+void halamanUtamaUser(int &userindex) {
     while(true){
         clearScreen();
         int opsi;
@@ -858,7 +1204,7 @@ void halamanUtama(int userindex) {
         cout << "1. Buat Playlist" << endl;
         cout << "2. Lihat Playlist" << endl;
         cout << "3. Ubah Playlist" << endl;
-        cout << "4. Hapus Playlist" << endl;
+        cout << "4. Hapus Data" << endl;
         cout << "5. Urutkan Data" << endl;
         cout << "6. Cari Data" << endl;
         cout << "7. Halaman Masuk" << endl;
@@ -888,7 +1234,8 @@ void halamanUtama(int userindex) {
             ubahPlaylist(&pengguna[userindex]);
         }
         else if(opsi == 4){
-            hapusPlaylist(&pengguna[userindex]);
+            hapusDataUser(pengguna, jumlahuser, userindex);
+            if(userindex == -1) return;
         }
         else if(opsi == 5){
             menuSorting(&pengguna[userindex]);
@@ -918,7 +1265,11 @@ int main(){
         if (!halamanMasuk(userindex)){
             break;
         }
-        halamanUtama(userindex);
+        if(pengguna[userindex].role == "admin"){
+            halamanUtamaAdmin(userindex);
+        } else {
+            halamanUtamaUser(userindex);
+        }
     }
     return 0;
 }
