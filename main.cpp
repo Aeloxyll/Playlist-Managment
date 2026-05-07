@@ -56,7 +56,7 @@ typedef struct {
     string judul;
     int jumlahlagu = 0;
     Musik lagu[50];
-    string privasi;   // "Publik" atau "Privat"
+    string privasi; 
 } Playlist;
 
 struct User {
@@ -74,14 +74,13 @@ typedef struct {
     string dibuatOleh;
 } PlaylistGlobal;
 
-// Array Global & Variabel Penghitung
+
 PlaylistGlobal playlistGlobal[50];
 int jumlahPlaylistGlobal = 0;
 
 User pengguna[50];
 int jumlahuser = 0;
 
-// ==================== PROSEDUR DAFTAR LAGU (REKURSIF) ====================
 void Daftarlagu(Playlist *p, int indexLagu) {
     if(indexLagu == (*p).jumlahlagu) return;
     
@@ -110,7 +109,6 @@ void DaftarLaguGlobal(PlaylistGlobal *pg, int indexLagu) {
     DaftarLaguGlobal(pg, indexLagu + 1);
 }
 
-// ==================== PROSEDUR & FUNGSI PENDUKUNG ====================
 bool usntersedia(User pengguna[], int jumlahuser, string targetUsername) {
     for(int i = 0; i < jumlahuser; i++){
         if(pengguna[i].username == targetUsername){
@@ -129,9 +127,6 @@ bool validasigenre(string genre) {
     return genre == "klasik" || genre == "pop" || genre == "rock" || genre == "jazz" || genre == "hip hop";
 }
 
-// ==================== PROSEDUR MODULAR BARU (REFACTORING) ====================
-
-// 1. Prosedur menampilkan playlist milik diri sendiri
 void tampilkanPlaylistSaya(User *u) {
     if (u->jumlahPlaylist == 0) {
         cout << "Anda belum memiliki playlist." << endl;
@@ -147,7 +142,6 @@ void tampilkanPlaylistSaya(User *u) {
     }
 }
 
-// 2. Prosedur menampilkan seluruh playlist publik secara langsung (Requirement 1)
 void tampilkanSemuaPlaylistPublik() {
     bool adaPublik = false;
     printHeader("SELURUH PLAYLIST PUBLIK");
@@ -214,7 +208,6 @@ void tampilkanStatistikAdmin() {
     cout << left << setw(20) << "Total Lagu" << ": " << totalLagu << endl;
 }
 
-// 5. Prosedur melihat seluruh playlist user + playlist global untuk Admin (Requirement 2)
 void tampilkanSemuaPlaylistDanGlobalAdmin() {
     bool ada = false;
     printHeader("SELURUH PLAYLIST USER");
@@ -239,7 +232,6 @@ void tampilkanSemuaPlaylistDanGlobalAdmin() {
     tampilkanPlaylistGlobal();
 }
 
-// ==================== FITUR SISTEM UTAMA ====================
 
 void Register(User pengguna[], int &jumlahuser) {
     if(jumlahuser >= 50){
@@ -1020,7 +1012,7 @@ bool linearSearchArtis(const Musik* arr, int n, const string& target, int& idx){
         if(arr[i].artis == target) {
             idx = i; 
             return true;
-         }
+        }
     }
     return false;
 }
@@ -1147,6 +1139,13 @@ void menuSearching(User *u){
 }
 
 int dapatkanIndexPlaylist(const User* u) {
+    cout << "Daftar Playlist:" << endl;
+    for(int i = 0; i < u->jumlahPlaylist; i++) {
+        cout<< i + 1 << ". " << u->musiklist[i].judul
+            << " (" << u->musiklist[i].jumlahlagu << " lagu)" << endl;
+    }
+    printLine();
+    
     int pilihan;
     while(true) {
         cout << "Pilih nomor playlist: ";
@@ -1319,10 +1318,10 @@ void halamanUtamaAdmin(int &userindex) {
         }cout << endl << endl;
         
         if (opsi == 1){
-            tampilkanStatistikAdmin(); // Memanggil Prosedur Statistik Admin baru (Mencakup data global)
+            tampilkanStatistikAdmin();
         }
         else if(opsi == 2){
-            tampilkanSemuaPlaylistDanGlobalAdmin(); // Memanggil Prosedur Daftar Playlist Admin baru
+            tampilkanSemuaPlaylistDanGlobalAdmin();
         }
         else if(opsi == 3){
             buatPlaylistGlobal(&pengguna[userindex]);
@@ -1403,7 +1402,7 @@ void halamanUtamaUser(int &userindex) {
 }
 
 int main(){
-    // Inisialisasi Akun Admin Default
+
     pengguna[jumlahuser].username = "admin";
     pengguna[jumlahuser].password = "123";
     pengguna[jumlahuser].role = "admin";
