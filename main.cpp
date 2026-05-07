@@ -56,7 +56,7 @@ typedef struct {
     string judul;
     int jumlahlagu = 0;
     Musik lagu[50];
-    string privasi;
+    string privasi;   // "Publik" atau "Privat"
 } Playlist;
 
 struct User {
@@ -74,12 +74,14 @@ typedef struct {
     string dibuatOleh;
 } PlaylistGlobal;
 
+// Array Global & Variabel Penghitung
 PlaylistGlobal playlistGlobal[50];
 int jumlahPlaylistGlobal = 0;
 
 User pengguna[50];
 int jumlahuser = 0;
 
+// ==================== PROSEDUR DAFTAR LAGU (REKURSIF) ====================
 void Daftarlagu(Playlist *p, int indexLagu) {
     if(indexLagu == (*p).jumlahlagu) return;
     
@@ -108,6 +110,7 @@ void DaftarLaguGlobal(PlaylistGlobal *pg, int indexLagu) {
     DaftarLaguGlobal(pg, indexLagu + 1);
 }
 
+// ==================== PROSEDUR & FUNGSI PENDUKUNG ====================
 bool usntersedia(User pengguna[], int jumlahuser, string targetUsername) {
     for(int i = 0; i < jumlahuser; i++){
         if(pengguna[i].username == targetUsername){
@@ -125,6 +128,118 @@ string toLowerCase(string str) {
 bool validasigenre(string genre) {
     return genre == "klasik" || genre == "pop" || genre == "rock" || genre == "jazz" || genre == "hip hop";
 }
+
+// ==================== PROSEDUR MODULAR BARU (REFACTORING) ====================
+
+// 1. Prosedur menampilkan playlist milik diri sendiri
+void tampilkanPlaylistSaya(User *u) {
+    if (u->jumlahPlaylist == 0) {
+        cout << "Anda belum memiliki playlist." << endl;
+    } else {
+        for (int i = 0; i < u->jumlahPlaylist; i++) {
+            cout << HEAD << endl;
+            cout << left << setw(15) << "Nama Playlist" << ": " << u->musiklist[i].judul << endl;
+            cout << left << setw(15) << "Jumlah Lagu" << ": " << u->musiklist[i].jumlahlagu << " Lagu" << endl;
+            cout << left << setw(15) << "Privasi" << ": " << u->musiklist[i].privasi << endl;
+            cout << HEAD << endl;
+            Daftarlagu(&u->musiklist[i], 0);
+        }
+    }
+}
+
+// 2. Prosedur menampilkan seluruh playlist publik secara langsung (Requirement 1)
+void tampilkanSemuaPlaylistPublik() {
+    bool adaPublik = false;
+    printHeader("SELURUH PLAYLIST PUBLIK");
+    for (int i = 0; i < jumlahuser; i++) {
+        bool userPunyaPublik = false;
+        for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
+            if (pengguna[i].musiklist[j].privasi == "Publik") {
+                if (!userPunyaPublik) {
+                    cout << ">> Playlist milik user [" << pengguna[i].username << "] <<" << endl;
+                    userPunyaPublik = true;
+                    adaPublik = true;
+                }
+                cout << HEAD << endl;
+                cout << left << setw(15) << "Nama Playlist" << ": " << pengguna[i].musiklist[j].judul << endl;
+                cout << left << setw(15) << "Jumlah Lagu" << ": " << pengguna[i].musiklist[j].jumlahlagu << " Lagu" << endl;
+                cout << HEAD << endl;
+                Daftarlagu(&pengguna[i].musiklist[j], 0);
+            }
+        }
+        if (userPunyaPublik) {
+            cout << endl;
+        }
+    }
+    if (!adaPublik) {
+        cout << "Tidak ada playlist publik yang tersedia saat ini." << endl;
+    }
+}
+
+void tampilkanPlaylistGlobal() {
+    if (jumlahPlaylistGlobal == 0) {
+        cout << "Belum ada playlist global." << endl;
+    } else {
+        for (int i = 0; i < jumlahPlaylistGlobal; i++) {
+            cout << HEAD << endl;
+            cout << left << setw(15) << "Nama Playlist" << ": " << playlistGlobal[i].judul << endl;
+            cout << left << setw(15) << "Jumlah Lagu" << ": " << playlistGlobal[i].jumlahlagu << " Lagu" << endl;
+            cout << left << setw(15) << "Dibuat Oleh" << ": " << playlistGlobal[i].dibuatOleh << endl;
+            cout << HEAD << endl;
+            DaftarLaguGlobal(&playlistGlobal[i], 0);
+        }
+    }
+}
+
+void tampilkanStatistikAdmin() {
+    int totalUser = jumlahuser;
+    int totalPlaylist = 0;
+    int totalLagu = 0;
+    
+    for (int i = 0; i < jumlahuser; i++) {
+        totalPlaylist += pengguna[i].jumlahPlaylist;
+        for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
+            totalLagu += pengguna[i].musiklist[j].jumlahlagu;
+        }
+    }
+
+    totalPlaylist += jumlahPlaylistGlobal;
+    for(int i = 0; i < jumlahPlaylistGlobal; i++) {
+        totalLagu += playlistGlobal[i].jumlahlagu;
+    }
+
+    printHeader("STATISTIK DATA");
+    cout << left << setw(20) << "Total User" << ": " << totalUser << endl;
+    cout << left << setw(20) << "Total Playlist" << ": " << totalPlaylist << " (Termasuk " << jumlahPlaylistGlobal << " Playlist Global)" << endl;
+    cout << left << setw(20) << "Total Lagu" << ": " << totalLagu << endl;
+}
+
+// 5. Prosedur melihat seluruh playlist user + playlist global untuk Admin (Requirement 2)
+void tampilkanSemuaPlaylistDanGlobalAdmin() {
+    bool ada = false;
+    printHeader("SELURUH PLAYLIST USER");
+    for (int i = 0; i < jumlahuser; i++) {
+        if (pengguna[i].jumlahPlaylist > 0) {
+            ada = true;
+            cout << "User: " << pengguna[i].username << endl;
+            for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
+                cout << HEAD << endl;
+                cout << left << setw(15) << "Nama Playlist" << ": " << pengguna[i].musiklist[j].judul << endl;
+                cout << left << setw(15) << "Privasi" << ": " << pengguna[i].musiklist[j].privasi << endl;
+                cout << left << setw(15) << "Jumlah Lagu" << ": " << pengguna[i].musiklist[j].jumlahlagu << " Lagu" << endl;
+                cout << HEAD << endl;
+                Daftarlagu(&pengguna[i].musiklist[j], 0);
+            }
+        }
+    }
+    if (!ada) cout << "Belum ada playlist user yang dibuat." << endl;
+    
+    printLine();
+    cout << "PLAYLIST GLOBAL SAAT INI:" << endl;
+    tampilkanPlaylistGlobal();
+}
+
+// ==================== FITUR SISTEM UTAMA ====================
 
 void Register(User pengguna[], int &jumlahuser) {
     if(jumlahuser >= 50){
@@ -310,7 +425,20 @@ void buatPlaylist(User *u) {
     cin.ignore();
     getline(cin, u->musiklist[playlist].judul);
     
-    u->musiklist[playlist].privasi = "Privat";
+    string privasi;
+    bool privasiValid = false;
+    do {
+        cout << left << setw(15) << "Privasi (Publik/Privat)" << ": ";
+        cin >> privasi;
+        privasi = toLowerCase(privasi);
+        if (privasi == "publik" || privasi == "privat") {
+            privasiValid = true;
+            if (privasi == "publik") u->musiklist[playlist].privasi = "Publik";
+            else u->musiklist[playlist].privasi = "Privat";
+        } else {
+            cout << left << setw(12) << "Info" << ": Hanya 'Publik' atau 'Privat'" << endl;
+        }
+    } while (!privasiValid);
 
     int jumlahlagu;
     bool jumlahvalid = false;
@@ -350,23 +478,41 @@ void buatPlaylist(User *u) {
 }
 
 void lihatPlaylist(User *u) {
-    int playlist = u->jumlahPlaylist;
-    
-    if(playlist == 0){
-        cout << left << setw(12) << "Info" << ": Anda belum memiliki Playlist" << endl;
+    printHeader("LIHAT PLAYLIST");
+    cout << "1. Playlist Saya" << endl;
+    cout << "2. Playlist Public dan Playlist Global" << endl;
+    cout << "Pilih opsi: ";
+
+    int opsi;
+    try {
+        cin >> opsi;
+        if (cin.fail()) {
+            cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            throw invalid_argument("angka");
+        }
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    } catch (const exception& e) {
+        cout << left << setw(12) << "Info" << ": Input harus " << e.what() << endl;
         pause();
         return;
     }
-    
-    printHeader("DAFTAR PLAYLIST");
-    for(int i = 0; i < playlist; i++){
-        cout << HEAD << endl;
-        cout << left << setw(15) << "Nama Playlist" << ": " << u->musiklist[i].judul << endl;
-        cout << left << setw(15) << "Jumlah Lagu" << ": " << u->musiklist[i].jumlahlagu << " Lagu" << endl;
-        cout << left << setw(15) << "Privasi" << ": " << u->musiklist[i].privasi << endl;
-        cout << HEAD << endl;
-        
-        Daftarlagu(&u->musiklist[i], 0);
+
+    switch (opsi) {
+        case 1:
+            tampilkanPlaylistSaya(u);
+            break;
+        case 2:
+            tampilkanSemuaPlaylistPublik();
+            printLine();
+            cout << HEAD << endl;
+            cout << "       PLAYLIST GLOBAL     " << endl;
+            cout << HEAD << endl;
+            tampilkanPlaylistGlobal();
+            break;
+
+        default:
+            cout << "Pilihan tidak valid." << endl;
     }
     pause();
 }
@@ -1151,8 +1297,8 @@ void halamanUtamaAdmin(int &userindex) {
         clearScreen();
         int opsi;
         printHeader("HALAMAN UTAMA - ADMIN");
-        cout << "1. " << endl;
-        cout << "2. " << endl;
+        cout << "1. Statistik Data" << endl;
+        cout << "2. Lihat Seluruh Playlist (Semua User & Global)" << endl;
         cout << "3. Buat Playlist Global" << endl;
         cout << "4. Update Playlist Global" << endl;
         cout << "5. Halaman Masuk" << endl;
@@ -1173,10 +1319,10 @@ void halamanUtamaAdmin(int &userindex) {
         }cout << endl << endl;
         
         if (opsi == 1){
-            // Fitur admin 1
+            tampilkanStatistikAdmin(); // Memanggil Prosedur Statistik Admin baru (Mencakup data global)
         }
         else if(opsi == 2){
-            // Fitur admin 2
+            tampilkanSemuaPlaylistDanGlobalAdmin(); // Memanggil Prosedur Daftar Playlist Admin baru
         }
         else if(opsi == 3){
             buatPlaylistGlobal(&pengguna[userindex]);
@@ -1193,6 +1339,7 @@ void halamanUtamaAdmin(int &userindex) {
             cout << left << setw(12) << "Info" << ": Pilihan tidak valid" << endl;
             pause();
         }
+        if (opsi != 5) pause();
     }
 }
 
@@ -1256,10 +1403,12 @@ void halamanUtamaUser(int &userindex) {
 }
 
 int main(){
+    // Inisialisasi Akun Admin Default
     pengguna[jumlahuser].username = "admin";
     pengguna[jumlahuser].password = "123";
     pengguna[jumlahuser].role = "admin";
     jumlahuser++;
+    
     while(true) {
         int userindex = -1;
         if (!halamanMasuk(userindex)){
