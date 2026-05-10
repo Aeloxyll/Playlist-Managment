@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <limits>
 #include <cstdlib>
+#include <fstream>          // Untuk baca/tulis file
+#include <sstream>          // Untuk parsing string
 using namespace std;
 
 const string LINE = "-----------------------------------------";
@@ -36,6 +38,26 @@ void printHeader(const string& title) {
     cout << HEAD << endl;
     cout << "= " << string(leftPad, ' ') << title.substr(0, len) << string(rightPad, ' ') << " =" << endl;
     cout << HEAD << endl;
+}
+
+// ============================================================
+// HELPER: Padding khusus agar garis kotak TETAP RAPI dengan EMOJI
+// ============================================================
+string padBox(string content) {
+    // Lebar dalam kotak HARUS tepat 29 karakter visual
+    int emojiCount = 0;
+    // Hitung emoji yang ada di string (setiap emoji +1 lebar visual)
+    string emojis = "🎵📀👤👑🌍🔒🎶👉🌐";
+    for (size_t i = 0; i < content.length(); ) {
+        unsigned char c = static_cast<unsigned char>(content[i]);
+        if (c >= 0xE0) { emojiCount++; i += 3; }      // Lewati byte UTF-8 emoji
+        else if (c >= 0xC0) { i += 2; }                // Lewati 2-byte UTF-8
+        else { i++; }
+    }
+    
+    // Rumus: Spasi yang dibutuhkan = 29 - panjangString + jumlahEmoji
+    int spacesNeeded = 29 - content.length() + emojiCount;
+    return content + string(max(0, spacesNeeded), ' ');
 }
 
 void pause() {
@@ -80,7 +102,62 @@ int jumlahPlaylistGlobal = 0;
 User pengguna[50];
 int jumlahuser = 0;
 
+// ============================================================
+// FUNGSI KARTU PLAYLIST (SUDAH DIJAMIN RAPI)
+// ============================================================
+void tampilkanKartuPlaylistUser(const Playlist& pl, const string& pemilik, int nomor) {
+    cout << "┌─────────────────────────────┐" << endl;
+    cout << "│  🎵  PLAYLIST               │" << endl;
+    cout << "│                             │" << endl;
 
+    string line1 = "  📀 " + pl.judul;
+    cout << "│" << padBox(line1) << "│" << endl;
+
+    string line2 = "  👤 " + pemilik;
+    cout << "│" << padBox(line2) << "│" << endl;
+
+    string icon = (pl.privasi == "Publik") ? "🌍" : "🔒";
+    string line3 = "  " + icon + "  " + pl.privasi;
+    cout << "│" << padBox(line3) << "│" << endl;
+
+    string line4 = "  🎶 " + to_string(pl.jumlahlagu) + " Lagu";
+    cout << "│" << padBox(line4) << "│" << endl;
+
+    cout << "│                             │" << endl;
+    string line5 = "  👉 Pilih: [" + to_string(nomor) + "]";
+    cout << "│" << padBox(line5) << "│" << endl;
+    cout << "└─────────────────────────────┘" << endl;
+}
+
+void tampilkanKartuPlaylistPublik(const Playlist& pl, const string& pemilik, int nomor) {
+    cout << "┌─────────────────────────────┐" << endl;
+    cout << "│  🌍  PUBLIC PLAYLIST        │" << endl;
+    cout << "│                             │" << endl;
+
+    cout << "│" << padBox("  📀 " + pl.judul) << "│" << endl;
+    cout << "│" << padBox("  👤 " + pemilik) << "│" << endl;
+    cout << "│" << padBox("  🌍  Publik") << "│" << endl;
+    cout << "│" << padBox("  🎶 " + to_string(pl.jumlahlagu) + " Lagu") << "│" << endl;
+    
+    cout << "│                             │" << endl;
+    cout << "│" << padBox("  👉 Pilih: [" + to_string(nomor) + "]") << "│" << endl;
+    cout << "└─────────────────────────────┘" << endl;
+}
+
+void tampilkanKartuPlaylistGlobal(const PlaylistGlobal& pg, int nomor) {
+    cout << "┌─────────────────────────────┐" << endl;
+    cout << "│  🌐  GLOBAL PLAYLIST        │" << endl;
+    cout << "│                             │" << endl;
+
+    cout << "│" << padBox("  📀 " + pg.judul) << "│" << endl;
+    cout << "│" << padBox("  👑 " + pg.dibuatOleh) << "│" << endl;
+    cout << "│" << padBox("  🌍  Publik") << "│" << endl;
+    cout << "│" << padBox("  🎶 " + to_string(pg.jumlahlagu) + " Lagu") << "│" << endl;
+    
+    cout << "│                             │" << endl;
+    cout << "│" << padBox("  👉 Pilih: [" + to_string(nomor) + "]") << "│" << endl;
+    cout << "└─────────────────────────────┘" << endl;
+}
 
 void Daftarlagu(Playlist *p, int indexLagu) {
     if(indexLagu == (*p).jumlahlagu) return;
@@ -212,28 +289,420 @@ void tampilkanStatistikAdmin() {
 }
 
 void tampilkanSemuaPlaylistDanGlobalAdmin() {
-    bool ada = false;
-    printHeader("SELURUH PLAYLIST USER");
+    printHeader("SEMUA PLAYLIST (ADMIN VIEW)");
+    
+    bool adaPlaylist = false;
+    vector<tuple<Playlist*, string, string, int>> semuaPlaylist; 
+    // {playlist, judul, pemilik, tipe(0=user,1=global)}
+    
+    // Kumpulkan playlist dari semua user
     for (int i = 0; i < jumlahuser; i++) {
-        if (pengguna[i].jumlahPlaylist > 0) {
-            ada = true;
-            cout << "User: " << pengguna[i].username << endl;
-            for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
-                cout << HEAD << endl;
-                cout << left << setw(15) << "Nama Playlist" << ": " << pengguna[i].musiklist[j].judul << endl;
-                cout << left << setw(15) << "Privasi" << ": " << pengguna[i].musiklist[j].privasi << endl;
-                cout << left << setw(15) << "Jumlah Lagu" << ": " << pengguna[i].musiklist[j].jumlahlagu << " Lagu" << endl;
-                cout << HEAD << endl;
-                Daftarlagu(&pengguna[i].musiklist[j], 0);
+        for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
+            semuaPlaylist.push_back({
+                &pengguna[i].musiklist[j], 
+                pengguna[i].musiklist[j].judul,
+                pengguna[i].username,
+                0 // tipe: 0 = user playlist
+            });
+            adaPlaylist = true;
+        }
+    }
+    
+    // Kumpulkan playlist global
+    for (int i = 0; i < jumlahPlaylistGlobal; i++) {
+        semuaPlaylist.push_back({
+            (Playlist*)&playlistGlobal[i], // Cast untuk reuse fungsi display
+            playlistGlobal[i].judul,
+            playlistGlobal[i].dibuatOleh + " [ADMIN]",
+            1 // tipe: 1 = global playlist
+        });
+        adaPlaylist = true;
+    }
+    
+    if (!adaPlaylist) {
+        cout << "\n📭 Belum ada playlist yang dibuat oleh user manapun." << endl;
+        return;
+    }
+    
+    cout << "\n📋 Pilih playlist untuk melihat detail:\n" << endl;
+    
+    // Tampilkan semua dalam bentuk kartu
+    for (int i = 0; i < (int)semuaPlaylist.size(); i++) {
+        Playlist* pl = get<0>(semuaPlaylist[i]);
+        string judul = get<1>(semuaPlaylist[i]);
+        string pemilik = get<2>(semuaPlaylist[i]);
+        int tipe = get<3>(semuaPlaylist[i]);
+        
+        if (tipe == 1) {
+            // Global playlist - tampilkan dengan style khusus
+            cout << "┌─────────────────────────────┐" << endl;
+            cout << "│  🌐  GLOBAL PLAYLIST        │" << endl;
+            cout << "│                             │" << endl;
+            if(judul.length() > 25) judul = judul.substr(0, 22) + "...";
+            cout << "│  📀 " << left << setw(20) << judul << " │" << endl;
+            if(pemilik.length() > 25) pemilik = pemilik.substr(0, 22) + "...";
+            cout << "│  👑 " << left << setw(20) << pemilik << " │" << endl;
+            cout << "│  🌍 " << left << setw(20) << "Publik" << " │" << endl;
+            cout << "│  🎶 " << left << setw(20) << to_string(pl->jumlahlagu) + " Lagu" << " │" << endl;
+            cout << "│                             │" << endl;
+            cout << "│  👉 Pilih: [" << right << setw(2) << i+1 << "]          │" << endl;
+            cout << "└─────────────────────────────┘" << endl;
+        } else {
+            // User playlist
+            string iconPrivasi = (pl->privasi == "Publik") ? "🌍" : "🔒";
+            cout << "┌─────────────────────────────┐" << endl;
+            cout << "│  🎵  PLAYLIST               │" << endl;
+            cout << "│                             │" << endl;
+            if(judul.length() > 25) judul = judul.substr(0, 22) + "...";
+            cout << "│  📀 " << left << setw(20) << judul << " │" << endl;
+            if(pemilik.length() > 25) pemilik = pemilik.substr(0, 22) + "...";
+            cout << "│  👤 " << left << setw(20) << pemilik << " │" << endl;
+            cout << "│  " << iconPrivasi << "  " << left << setw(20) << pl->privasi << " │" << endl;
+            cout << "│  🎶 " << left << setw(20) << to_string(pl->jumlahlagu) + " Lagu" << " │" << endl;
+            cout << "│                             │" << endl;
+            cout << "│  👉 Pilih: [" << right << setw(2) << i+1 << "]          │" << endl;
+            cout << "└─────────────────────────────┘" << endl;
+        }
+        if (i < (int)semuaPlaylist.size() - 1) cout << endl;
+    }
+    
+    // Minta admin memilih
+    cout << "\n┌─────────────────────────────┐" << endl;
+    cout << "│  🔢 Masukkan nomor playlist:  │" << endl;
+    cout << "└─────────────────────────────┘" << endl;
+    cout << "Pilihan (1-" << semuaPlaylist.size() << ") atau 0 untuk batal: ";
+    
+    int pilihan;
+    cin >> pilihan;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    
+    if (pilihan >= 1 && pilihan <= (int)semuaPlaylist.size()) {
+        int idx = pilihan - 1;
+        Playlist* selected = get<0>(semuaPlaylist[idx]);
+        string judul = get<1>(semuaPlaylist[idx]);
+        string pemilik = get<2>(semuaPlaylist[idx]);
+        int tipe = get<3>(semuaPlaylist[idx]);
+        
+        printHeader(judul);
+        cout << "👤 Oleh: " << pemilik;
+        if (tipe == 1) {
+            cout << " | 🌐 Global";
+        } else {
+            cout << " | " << selected->privasi;
+        }
+        cout << " | 🎶 " << selected->jumlahlagu << " Lagu" << endl;
+        printLine();
+        
+        // Tampilkan isi playlist
+        if (tipe == 1) {
+            DaftarLaguGlobal((PlaylistGlobal*)selected, 0);
+        } else {
+            Daftarlagu(selected, 0);
+        }
+        
+    } else if (pilihan == 0) {
+        cout << "\n✅ Batal memilih playlist." << endl;
+    } else {
+        cout << "\n❌ Nomor tidak valid." << endl;
+    }
+}
+
+// ============================================================
+// FUNGSI SAVE DATA KE FILE (PERSISTENCE)
+// ============================================================
+
+void saveData() {
+    // ===== 1. SIMPAN DATA USER =====
+    ofstream fileUser("data_users.txt");
+    if (fileUser.is_open()) {
+        for (int i = 0; i < jumlahuser; i++) {
+            fileUser << pengguna[i].username << "|" 
+                    << pengguna[i].password << "|" 
+                    << pengguna[i].role << "|"
+                    << pengguna[i].jumlahPlaylist << "\n";
+        }
+        fileUser.close();
+    }
+
+    // ===== 2. SIMPAN PLAYLIST USER =====
+    ofstream filePlaylist("data_playlists.txt");
+    if (filePlaylist.is_open()) {
+        for (int u = 0; u < jumlahuser; u++) {
+            for (int p = 0; p < pengguna[u].jumlahPlaylist; p++) {
+                Playlist& pl = pengguna[u].musiklist[p];
+                // Format: username|judul|jumlahlagu|privasi
+                filePlaylist << pengguna[u].username << "|" 
+                           << pl.judul << "|" 
+                           << pl.jumlahlagu << "|" 
+                           << pl.privasi << "\n";
+                
+                // Simpan detail lagu
+                for (int l = 0; l < pl.jumlahlagu; l++) {
+                    filePlaylist << "  "  // Indentasi penanda lagu
+                               << pl.lagu[l].judulLagu << "|"
+                               << pl.lagu[l].artis << "|"
+                               << pl.lagu[l].genre << "|"
+                               << pl.lagu[l].tahun << "\n";
+                }
+            }
+        }
+        filePlaylist.close();
+    }
+
+    // ===== 3. SIMPAN PLAYLIST GLOBAL =====
+    ofstream fileGlobal("data_global.txt");
+    if (fileGlobal.is_open()) {
+        for (int i = 0; i < jumlahPlaylistGlobal; i++) {
+            PlaylistGlobal& pg = playlistGlobal[i];
+            fileGlobal << pg.judul << "|" 
+                      << pg.jumlahlagu << "|" 
+                      << pg.dibuatOleh << "\n";
+            
+            for (int l = 0; l < pg.jumlahlagu; l++) {
+                fileGlobal << "  "
+                          << pg.lagu[l].judulLagu << "|"
+                          << pg.lagu[l].artis << "|"
+                          << pg.lagu[l].genre << "|"
+                          << pg.lagu[l].tahun << "\n";
+            }
+        }
+        fileGlobal.close();
+    }
+    
+    cout << "\n💾 Data berhasil disimpan ke file!" << endl;
+}
+
+// ============================================================
+// FUNGSI RESET SEMUA DATA (MENCEGAH GHOST DATA)
+// ============================================================
+void resetAllData() {
+    // Reset counter global
+    jumlahuser = 0;
+    jumlahPlaylistGlobal = 0;
+    
+    // Reset array pengguna[]
+    for(int i = 0; i < 50; i++) {
+        pengguna[i].username = "";
+        pengguna[i].password = "";
+        pengguna[i].role = "";
+        pengguna[i].jumlahPlaylist = 0;
+        
+        // Reset semua playlist di user ini
+        for(int p = 0; p < 50; p++) {
+            pengguna[i].musiklist[p].judul = "";
+            pengguna[i].musiklist[p].jumlahlagu = 0;
+            pengguna[i].musiklist[p].privasi = "";
+            
+            // Reset semua lagu di playlist ini
+            for(int l = 0; l < 50; l++) {
+                pengguna[i].musiklist[p].lagu[l].judulLagu = "";
+                pengguna[i].musiklist[p].lagu[l].artis = "";
+                pengguna[i].musiklist[p].lagu[l].genre = "";
+                pengguna[i].musiklist[p].lagu[l].tahun = 0;
             }
         }
     }
-    if (!ada) cout << "Belum ada playlist user yang dibuat." << endl;
     
-    printLine();
-    cout << "PLAYLIST GLOBAL SAAT INI:" << endl;
-    tampilkanPlaylistGlobal();
+    // Reset array playlistGlobal[]
+    for(int i = 0; i < 50; i++) {
+        playlistGlobal[i].judul = "";
+        playlistGlobal[i].jumlahlagu = 0;
+        playlistGlobal[i].dibuatOleh = "";
+        
+        for(int l = 0; l < 50; l++) {
+            playlistGlobal[i].lagu[l].judulLagu = "";
+            playlistGlobal[i].lagu[l].artis = "";
+            playlistGlobal[i].lagu[l].genre = "";
+            playlistGlobal[i].lagu[l].tahun = 0;
+        }
+    }
 }
+
+// ============================================================
+// FUNGSI LOAD DATA DARI FILE (PERSISTENCE)
+// ============================================================
+
+// ============================================================
+// FUNGSI LOAD DATA DARI FILE (SUDAH DI-FIX)
+// ============================================================
+
+void loadData() {
+    // 🔥 PENTING: Reset semua data dulu sebelum load!
+    resetAllData();
+    
+    // ===== 1. LOAD DATA USER =====
+    ifstream fileUser("data_users.txt");
+    if (fileUser.is_open()) {
+        string line;
+        while (getline(fileUser, line) && jumlahuser < 50) {
+            if(line.empty()) continue; // Skip baris kosong
+            
+            stringstream ss(line);
+            string username, password, role, jmlPlaylist;
+            
+            getline(ss, username, '|');
+            getline(ss, password, '|');
+            getline(ss, role, '|');
+            getline(ss, jmlPlaylist, '|');
+            
+            if(username.empty()) continue; // Skip data invalid
+            
+            pengguna[jumlahuser].username = username;
+            pengguna[jumlahuser].password = password;
+            pengguna[jumlahuser].role = role;
+            pengguna[jumlahuser].jumlahPlaylist = stoi(jmlPlaylist);
+            jumlahuser++;
+        }
+        fileUser.close();
+    }
+
+    // ===== 2. LOAD PLAYLIST USER =====
+    ifstream filePlaylist("data_playlists.txt");
+    if (filePlaylist.is_open()) {
+        string line;
+        while (getline(filePlaylist, line)) {
+            if(line.empty()) continue;
+            
+            // Skip baris lagu (dimulai dengan spasi)
+            if (line[0] == ' ') continue;
+            
+            stringstream ss(line);
+            string username, judul, jmlLagu, privasi;
+            
+            getline(ss, username, '|');
+            getline(ss, judul, '|');
+            getline(ss, jmlLagu, '|');
+            getline(ss, privasi, '|');
+            
+            if(username.empty() || judul.empty()) continue;
+            
+            // Cari user yang sesuai
+            for (int u = 0; u < jumlahuser; u++) {
+                if (pengguna[u].username == username) {
+                    int idx = pengguna[u].jumlahPlaylist;
+                    if(idx >= 50) break; // Safety check
+                    
+                    // Reset playlist dulu sebelum diisi
+                    pengguna[u].musiklist[idx].judul = "";
+                    pengguna[u].musiklist[idx].jumlahlagu = 0;
+                    pengguna[u].musiklist[idx].privasi = "";
+                    for(int l = 0; l < 50; l++) {
+                        pengguna[u].musiklist[idx].lagu[l].judulLagu = "";
+                        pengguna[u].musiklist[idx].lagu[l].artis = "";
+                        pengguna[u].musiklist[idx].lagu[l].genre = "";
+                        pengguna[u].musiklist[idx].lagu[l].tahun = 0;
+                    }
+                    
+                    // Isi data playlist
+                    pengguna[u].musiklist[idx].judul = judul;
+                    pengguna[u].musiklist[idx].jumlahlagu = stoi(jmlLagu);
+                    pengguna[u].musiklist[idx].privasi = privasi;
+                    
+                    // Baca lagu-lagu berikutnya (yang di-indent)
+                    int laguDibaca = 0;
+                    while (laguDibaca < pengguna[u].musiklist[idx].jumlahlagu && 
+                           getline(filePlaylist, line)) {
+                        if (line[0] == ' ') {
+                            stringstream ls(line.substr(2)); // Hapus indentasi
+                            string judulLagu, artis, genre, tahun;
+                            
+                            getline(ls, judulLagu, '|');
+                            getline(ls, artis, '|');
+                            getline(ls, genre, '|');
+                            getline(ls, tahun, '|');
+                            
+                            pengguna[u].musiklist[idx].lagu[laguDibaca].judulLagu = judulLagu;
+                            pengguna[u].musiklist[idx].lagu[laguDibaca].artis = artis;
+                            pengguna[u].musiklist[idx].lagu[laguDibaca].genre = genre;
+                            pengguna[u].musiklist[idx].lagu[laguDibaca].tahun = stoi(tahun);
+                            laguDibaca++;
+                        } else {
+                            // Jika ketemu header playlist lain, push back line dan break
+                            filePlaylist.putback(line.back());
+                            for(int i = line.length()-2; i >= 0; i--) {
+                                filePlaylist.putback(line[i]);
+                            }
+                            break;
+                        }
+                    }
+                    pengguna[u].jumlahPlaylist++;
+                    break;
+                }
+            }
+        }
+        filePlaylist.close();
+    }
+
+    // ===== 3. LOAD PLAYLIST GLOBAL =====
+    ifstream fileGlobal("data_global.txt");
+    if (fileGlobal.is_open()) {
+        string line;
+        while (getline(fileGlobal, line)) {
+            if(line.empty()) continue;
+            if (line[0] == ' ') continue; // Skip baris lagu
+            
+            stringstream ss(line);
+            string judul, jmlLagu, dibuatOleh;
+            
+            getline(ss, judul, '|');
+            getline(ss, jmlLagu, '|');
+            getline(ss, dibuatOleh, '|');
+            
+            if(judul.empty()) continue;
+            
+            int idx = jumlahPlaylistGlobal;
+            if(idx >= 50) break;
+            
+            // Reset playlist global dulu
+            playlistGlobal[idx].judul = "";
+            playlistGlobal[idx].jumlahlagu = 0;
+            playlistGlobal[idx].dibuatOleh = "";
+            for(int l = 0; l < 50; l++) {
+                playlistGlobal[idx].lagu[l].judulLagu = "";
+                playlistGlobal[idx].lagu[l].artis = "";
+                playlistGlobal[idx].lagu[l].genre = "";
+                playlistGlobal[idx].lagu[l].tahun = 0;
+            }
+            
+            // Isi data
+            playlistGlobal[idx].judul = judul;
+            playlistGlobal[idx].jumlahlagu = stoi(jmlLagu);
+            playlistGlobal[idx].dibuatOleh = dibuatOleh;
+            
+            // Baca lagu-lagu
+            int laguDibaca = 0;
+            while (laguDibaca < playlistGlobal[idx].jumlahlagu && 
+                   getline(fileGlobal, line)) {
+                if (line[0] == ' ') {
+                    stringstream ls(line.substr(2));
+                    string judulLagu, artis, genre, tahun;
+                    
+                    getline(ls, judulLagu, '|');
+                    getline(ls, artis, '|');
+                    getline(ls, genre, '|');
+                    getline(ls, tahun, '|');
+                    
+                    playlistGlobal[idx].lagu[laguDibaca].judulLagu = judulLagu;
+                    playlistGlobal[idx].lagu[laguDibaca].artis = artis;
+                    playlistGlobal[idx].lagu[laguDibaca].genre = genre;
+                    playlistGlobal[idx].lagu[laguDibaca].tahun = stoi(tahun);
+                    laguDibaca++;
+                } else {
+                    fileGlobal.putback(line.back());
+                    for(int i = line.length()-2; i >= 0; i--) {
+                        fileGlobal.putback(line[i]);
+                    }
+                    break;
+                }
+            }
+            jumlahPlaylistGlobal++;
+        }
+        fileGlobal.close();
+    }
+}
+
+
+//============ HALAMAN MASUK ============
 
 void Register(User pengguna[], int &jumlahuser) {
     if(jumlahuser >= 50){
@@ -256,6 +725,9 @@ void Register(User pengguna[], int &jumlahuser) {
         pengguna[jumlahuser].password = password;
         jumlahuser++; 
         cout << left << setw(12) << "Info" << ": Akun berhasil dibuat" << endl;
+        
+        // 🔥 AUTO-SAVE SETELAH REGISTER
+        saveData();  // ← TAMBAHKAN INI
     }
     pause();
 }
@@ -270,7 +742,7 @@ int Login(User pengguna[], int jumlahuser, int &userindex, int &bataslogin) {
 
         for(int i = 0; i < jumlahuser; i++){
             if(pengguna[i].username == username && pengguna[i].password == password){
-                cout << left << setw(12) << "Info" << ": Login berhasil" << endl;
+                cout << left << setw(12)<<  "Info" << ": Login berhasil" << endl;
                 userindex = i; 
                 logvalid = true; 
                 bataslogin = 0;
@@ -404,16 +876,19 @@ void buatPlaylist(User *u) {
         Datalagu(&u->musiklist[playlist].lagu[i], (i == 0));
     }
 
+// Di dalam fungsi buatPlaylist(), setelah jumlahPlaylist++:
     u->musiklist[playlist].jumlahlagu = jumlahlagu;
     u->jumlahPlaylist++; 
     cout << left << setw(12) << "Info" << ": Playlist berhasil dibuat" << endl;
+    
+    // 🔥 AUTO-SAVE SETELAH BUAT PLAYLIST
+    saveData();  // ← TAMBAHKAN INI
     pause();
 }
-
 void lihatPlaylist(User *u) {
     printHeader("LIHAT PLAYLIST");
     cout << "1. Playlist Saya" << endl;
-    cout << "2. Playlist Publik dan Playlist Global" << endl;
+    cout << "2. Playlist Publik & Global" << endl;
     cout << "Pilih opsi: ";
 
     int opsi;
@@ -430,24 +905,139 @@ void lihatPlaylist(User *u) {
         return;
     }
 
-    switch (opsi) {
-        case 1:
-            tampilkanPlaylistSaya(u);
-            break;
-        case 2:
-            tampilkanSemuaPlaylistPublik();
+    if (opsi == 1) {
+        // ===== TAMPILKAN PLAYLIST SAYA DENGAN KARTU =====
+        printHeader("PLAYLIST SAYA");
+        
+        if (u->jumlahPlaylist == 0) {
+            cout << "\n📭 Anda belum memiliki playlist." << endl;
+            cout << "💡 Tips: Buat playlist baru untuk mulai mengumpulkan lagu!" << endl;
+        } else {
+            cout << "\n📋 Pilih playlist yang ingin dibuka:\n" << endl;
+            
+            // Tampilkan semua playlist dalam bentuk kartu
+            for (int i = 0; i < u->jumlahPlaylist; i++) {
+                tampilkanKartuPlaylistUser(u->musiklist[i], "Saya", i + 1);
+                if (i < u->jumlahPlaylist - 1) cout << endl; // Jarak antar kartu
+            }
+            
+            // Minta user memilih
+            cout << "\n┌─────────────────────────────┐" << endl;
+            cout << "│  🔢 Masukkan nomor playlist:  │" << endl;
+            cout << "└─────────────────────────────┘" << endl;
+            cout << "Pilihan (1-" << u->jumlahPlaylist << ") atau 0 untuk batal: ";
+            
+            int pilihan;
+            cin >> pilihan;
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            
+            if (pilihan >= 1 && pilihan <= u->jumlahPlaylist) {
+                int idx = pilihan - 1;
+                // Tampilkan isi playlist yang dipilih
+                printHeader(u->musiklist[idx].judul);
+                cout << "👤 Oleh: Saya | 🔒 " << u->musiklist[idx].privasi 
+                     << " | 🎶 " << u->musiklist[idx].jumlahlagu << " Lagu" << endl;
+                printLine();
+                Daftarlagu(&u->musiklist[idx], 0);
+            } else if (pilihan == 0) {
+                cout << "\n✅ Batal memilih playlist." << endl;
+            } else {
+                cout << "\n❌ Nomor tidak valid." << endl;
+            }
+        }
+        
+    } 
+    else if (opsi == 2) {
+        // ===== TAMPILKAN PLAYLIST PUBLIK & GLOBAL DENGAN KARTU =====
+        vector<pair<Playlist*, string>> poolPublik; // {playlist, pemilik}
+        vector<pair<PlaylistGlobal*, string>> poolGlobal; // {playlist, label}
+        
+        // Kumpulkan playlist publik dari user lain
+        for (int i = 0; i < jumlahuser; i++) {
+            if (pengguna[i].username == u->username) continue; // Skip diri sendiri
+            for (int j = 0; j < pengguna[i].jumlahPlaylist; j++) {
+                if (pengguna[i].musiklist[j].privasi == "Publik") {
+                    poolPublik.push_back({&pengguna[i].musiklist[j], pengguna[i].username});
+                }
+            }
+        }
+        
+        // Kumpulkan playlist global
+        for (int i = 0; i < jumlahPlaylistGlobal; i++) {
+            poolGlobal.push_back({&playlistGlobal[i], "Global"});
+        }
+        
+        int totalKartu = poolPublik.size() + poolGlobal.size();
+        
+        if (totalKartu == 0) {
+            cout << "\n📭 Belum ada playlist publik atau global yang tersedia." << endl;
+        } else {
+            cout << "\n🌍 PLAYLIST PUBLIK DARI USER LAIN:" << endl;
             printLine();
-            cout << HEAD << endl;
-            cout << "       PLAYLIST GLOBAL     " << endl;
-            cout << HEAD << endl;
-            tampilkanPlaylistGlobal();
-            break;
-        default:
-            cout << "Pilihan tidak valid." << endl;
+            
+            if (poolPublik.empty()) {
+                cout << "(Tidak ada)" << endl;
+            } else {
+                for (int i = 0; i < (int)poolPublik.size(); i++) {
+                    tampilkanKartuPlaylistPublik(*poolPublik[i].first, poolPublik[i].second, i + 1);
+                    if (i < (int)poolPublik.size() - 1) cout << endl;
+                }
+            }
+            
+            cout << "\n\n🌐 PLAYLIST GLOBAL (ADMIN):" << endl;
+            printLine();
+            
+            if (poolGlobal.empty()) {
+                cout << "(Tidak ada)" << endl;
+            } else {
+                for (int i = 0; i < (int)poolGlobal.size(); i++) {
+                    tampilkanKartuPlaylistGlobal(*poolGlobal[i].first, (int)poolPublik.size() + i + 1);
+                    if (i < (int)poolGlobal.size() - 1) cout << endl;
+                }
+            }
+            
+            // Minta user memilih
+            cout << "\n┌─────────────────────────────┐" << endl;
+            cout << "│  🔢 Masukkan nomor playlist:  │" << endl;
+            cout << "└─────────────────────────────┘" << endl;
+            cout << "Pilihan (1-" << totalKartu << ") atau 0 untuk batal: ";
+            
+            int pilihan;
+            cin >> pilihan;
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            
+            if (pilihan >= 1 && pilihan <= (int)poolPublik.size()) {
+                // Pilih dari pool publik
+                int idx = pilihan - 1;
+                Playlist* selected = poolPublik[idx].first;
+                string pemilik = poolPublik[idx].second;
+                
+                printHeader(selected->judul);
+                cout << "👤 Oleh: " << pemilik << " | 🌍 Publik | 🎶 " 
+                     << selected->jumlahlagu << " Lagu" << endl;
+                printLine();
+                Daftarlagu(selected, 0);
+                
+            } else if (pilihan > (int)poolPublik.size() && pilihan <= totalKartu) {
+                // Pilih dari pool global
+                int idx = pilihan - (int)poolPublik.size() - 1;
+                PlaylistGlobal* selected = poolGlobal[idx].first;
+                
+                printHeader(selected->judul);
+                cout << "👑 Oleh: " << selected->dibuatOleh << " | 🌐 Global | 🎶 " 
+                     << selected->jumlahlagu << " Lagu" << endl;
+                printLine();
+                DaftarLaguGlobal(selected, 0);
+                
+            } else if (pilihan == 0) {
+                cout << "\n✅ Batal memilih playlist." << endl;
+            } else {
+                cout << "\n❌ Nomor tidak valid." << endl;
+            }
+        }
     }
     pause();
 }
-
 void ubahPlaylist(User *u) {
     int totalPlaylist = u->jumlahPlaylist; 
     if(totalPlaylist == 0){
@@ -569,6 +1159,7 @@ void ubahPlaylist(User *u) {
         cout << left << setw(20) << "Status Baru" << ": " << u->musiklist[indexP].privasi << endl;
         cout << left << setw(12) << "Info" << ": Status privasi berhasil diperbarui" << endl;
     }
+    saveData(); 
     pause();
 }
 
@@ -642,6 +1233,8 @@ void hapusDataUser(User pengguna[], int &jumlahuser, int &userindex) {
         }
         u->jumlahPlaylist--;
         cout << left << setw(12) << "Info" << ": Playlist berhasil dihapus" << endl;
+        saveData();
+        return;
     } 
     else if(Opsi == 2){
         User *u = &pengguna[userindex];
@@ -715,7 +1308,9 @@ void hapusDataUser(User pengguna[], int &jumlahuser, int &userindex) {
             }
             u->musiklist[indexP].jumlahlagu--;
             cout << left << setw(12) << "Info" << ": Lagu berhasil dihapus" << endl;
+            saveData(); 
         }
+        return;
     }
     else if(Opsi == 3){
         cout << "Apakah anda yakin ingin menghapus akun? (y/n): ";
@@ -728,6 +1323,7 @@ void hapusDataUser(User pengguna[], int &jumlahuser, int &userindex) {
             jumlahuser--;
             userindex = -1;
             cout << left << setw(12) << "Info" << ": Akun berhasil dihapus" << endl;
+            saveData(); 
             pause();
             return;
         }
@@ -782,6 +1378,7 @@ void buatPlaylistGlobal(User *u) {
     playlistGlobal[idx].dibuatOleh = u->username;
     jumlahPlaylistGlobal++;
     cout << left << setw(12) << "Info" << ": Playlist Global berhasil dibuat" << endl;
+    saveData();
     pause();
 }
 
@@ -897,6 +1494,7 @@ void updatePlaylistGlobal() {
             cout << left << setw(12) << "Info" << ": Data lagu berhasil diubah" << endl;
         }
     }
+    saveData();
     pause();
 }
 
@@ -1236,7 +1834,7 @@ bool halamanMasuk(int &userindex) {
         }
         else if(opsi == 2){
             int loginStatus = Login(pengguna, jumlahuser, userindex, bataslogin);
-            if(loginStatus == 1)  return true;
+            if(loginStatus == 1)       return true;
             else if(loginStatus == -1) return false;
         }
         else if(opsi == 3){
@@ -1257,7 +1855,7 @@ void halamanUtamaAdmin(int &userindex) {
         int opsi;
         printHeader("HALAMAN UTAMA - ADMIN");
         cout << "1. Statistik Data" << endl;
-        cout << "2. Lihat Seluruh Playlist (Semua User & Global)" << endl;
+        cout << "2. Lihat Seluruh Playlist" << endl;
         cout << "3. Buat Playlist Global" << endl;
         cout << "4. Update Playlist Global" << endl;
         cout << "5. Halaman Masuk" << endl;
@@ -1365,14 +1963,26 @@ void halamanUtamaUser(int &userindex) {
 }
 
 int main(){
-    pengguna[jumlahuser].username = "admin";
-    pengguna[jumlahuser].password = "123";
-    pengguna[jumlahuser].role     = "admin";
-    jumlahuser++;
+    #ifdef _WIN32
+        system("chcp 65001 >nul");
+    #endif
+    
+    resetAllData();
+    loadData();
+    
+    if (jumlahuser == 0) {
+        pengguna[jumlahuser].username = "admin";
+        pengguna[jumlahuser].password = "123";
+        pengguna[jumlahuser].role = "admin";
+        jumlahuser++;
+    }
     
     while(true) {
         int userindex = -1;
-        if (!halamanMasuk(userindex)) break;
+        if(!halamanMasuk(userindex)) {
+            saveData(); 
+            break;
+        }
         if(pengguna[userindex].role == "admin"){
             halamanUtamaAdmin(userindex);
         } else {
